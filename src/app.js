@@ -114,6 +114,7 @@ io.on('connection', (socket) => {
     // send all the current producer to newly joined member
     let producerList = roomList.get(socket.room_id).getProducerListForPeer()
 
+    //console.log('newProducers', producerList)
     socket.emit('newProducers', producerList)
   })
 
@@ -123,6 +124,7 @@ io.on('connection', (socket) => {
     })
 
     try {
+      console.log('getRouterRtpCapabilities', roomList.get(socket.room_id).getRtpCapabilities())
       callback(roomList.get(socket.room_id).getRtpCapabilities())
     } catch (e) {
       callback({
@@ -174,6 +176,8 @@ io.on('connection', (socket) => {
       producer_id
     })
   })
+
+  //socket.on('startRecord', async ({ 
 
   socket.on('consume', async ({ consumerTransportId, producerId, rtpCapabilities }, callback) => {
     //TODO null handling

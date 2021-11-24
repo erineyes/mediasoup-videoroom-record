@@ -37,6 +37,59 @@ module.exports = class Room {
     return this.router.rtpCapabilities
   }
 
+  async publishRtpStream(socket_id, producer, rtpPort, rtcpPort) {
+    const transport = await this.router.createPlainRtpTransport(config.mediasoup.plainRtpTransport)
+    await transport.connect({
+	    ip: config.mediasoup.plainRtpTransport.announcedIp,
+	    port: rtpPort,
+    	    rtcpPort: rtcpPort
+    });
+
+    console.log('Adding plain transport', { transportId: transport.id })
+    this.peers.get(socket_id).addTransport(transport)
+
+    const codecs = []
+    const routerCodec = this.router.rtpCapabilities.codecs.find(
+	    codec => codec.kind === producer.kind
+    )
+
+    codecs.push(routerCodec)
+
+    const rtpCapabilities = {
+	    codecs,
+	    rtcpFeedback: []
+    }
+
+    const rtpConsumer = await transport.consume({
+	    producerId: producer.id,
+	    rtpCapabilities,
+	    paused: false
+    })
+
+    let { consumer, params } = await this.peers.get(socket_id).createConsumer(transport.id, producer.id, rtpCapabilities)
+    consumer.on(
+	    'producerclose',
+	    function () {
+		    console.log('Consumer closed due to producerclose event for Recording', {
+			name: `${this.peers.get(socket_id).name}`,
+			consumer_id: `${consumer.id}`
+		    })
+		    this.peers.get(socket_id).removeConsumer(consumer.id)
+		    this.io.to(socket_id).emit('consumerClosed for Recording', {
+			consumer_id: consumer.id
+		    })
+	    }.bind(this)
+    )
+   return params 
+   /*
+    return {
+      params: {
+        id: transport.id
+      }
+    }
+   */
+  }
+
   async createWebRtcTransport(socket_id) {
     const { maxIncomingBitrate, initialAvailableOutgoingBitrate } = config.mediasoup.webRtcTransport
 
@@ -90,6 +143,7 @@ module.exports = class Room {
     return new Promise(
       async function (resolve, reject) {
         let producer = await this.peers.get(socket_id).createProducer(producerTransportId, rtpParameters, kind)
+        console.log("createProducer")
         resolve(producer.id)
         this.broadCast(socket_id, 'newProducers', [
           {
@@ -116,6 +170,7 @@ module.exports = class Room {
     let { consumer, params } = await this.peers
       .get(socket_id)
       .createConsumer(consumer_transport_id, producer_id, rtpCapabilities)
+    console.log("createConsumer")
 
     consumer.on(
       'producerclose',

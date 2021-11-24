@@ -68,11 +68,19 @@ module.exports = {
       listenIps: [
         {
           ip: '0.0.0.0',
-          announcedIp: getLocalIp() // replace by public IP address
+          announcedIp: "3.38.119.80" // replace by public IP address
         }
       ],
       maxIncomingBitrate: 1500000,
       initialAvailableOutgoingBitrate: 1000000
+    },
+    plainRtpTransport: {
+      listenIp: {
+       ip: '0.0.0.0',
+       announcedIp: '127.0.0.1'
+      },
+      rtcpMux: true,
+      comedia: false
     }
   }
 }
