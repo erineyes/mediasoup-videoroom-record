@@ -3,7 +3,8 @@ if (location.href.substr(0, 5) !== 'https') location.href = 'https' + location.h
 const socket = io()
 
 let producer = null
-
+let pubAudio = false
+let pubVideo = false
 nameInput.value = 'user_' + Math.round(Math.random() * 1000)
 
 socket.request = function request(type, data = {}) {
@@ -59,29 +60,53 @@ function addListeners() {
   rc.on(RoomClient.EVENTS.startScreen, () => {
     hide(startScreenButton)
     reveal(stopScreenButton)
+    reveal(startRecordButton)
+    reveal(stopRecordButton)
+    pubVideo = true
   })
 
   rc.on(RoomClient.EVENTS.stopScreen, () => {
     hide(stopScreenButton)
     reveal(startScreenButton)
+    pubVideo = false
+    if(pubAudio == false) {
+      hide(startRecordButton)
+      hide(stopRecordButton)
+    }
   })
 
   rc.on(RoomClient.EVENTS.stopAudio, () => {
     hide(stopAudioButton)
     reveal(startAudioButton)
+    pubAudio = false
+    if(pubVideo == false) {
+      hide(startRecordButton)
+      hide(stopRecordButton)
+    }
   })
   rc.on(RoomClient.EVENTS.startAudio, () => {
     hide(startAudioButton)
     reveal(stopAudioButton)
+    reveal(startRecordButton)
+    reveal(stopRecordButton)
+    pubAudio = true
   })
 
   rc.on(RoomClient.EVENTS.startVideo, () => {
     hide(startVideoButton)
     reveal(stopVideoButton)
+    reveal(startRecordButton)
+    reveal(stopRecordButton)
+    pubVideo = true
   })
   rc.on(RoomClient.EVENTS.stopVideo, () => {
     hide(stopVideoButton)
     reveal(startVideoButton)
+    pubVideo = false
+    if(pubAudio == false) {
+      hide(startRecordButton)
+      hide(stopRecordButton)
+    }
   })
   rc.on(RoomClient.EVENTS.exitRoom, () => {
     hide(control)

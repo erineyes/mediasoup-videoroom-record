@@ -36,23 +36,62 @@ module.exports = class Room {
   getRtpCapabilities() {
     return this.router.rtpCapabilities
   }
+  
+  /*
+  async startRecord(socket_id) {
+    let producers = this.peers.get(socket_id).producers
+    let params = {}
+    for(const producer of producers) {
+      params = await publishRtpStream(socket_id, producer, 50000, 50001)
+    }
+    return params
+  }
+  */
 
   async publishRtpStream(socket_id, producer, rtpPort, rtcpPort) {
-    const transport = await this.router.createPlainRtpTransport(config.mediasoup.plainRtpTransport)
-    await transport.connect({
-	    ip: config.mediasoup.plainRtpTransport.announcedIp,
+    const rtpTransport = await this.router.createPlainTransport(config.mediasoup.plainRtpTransport)
+    console.log({
+	    ip: "13.124.39.3",
 	    port: rtpPort,
     	    rtcpPort: rtcpPort
-    });
+    })
 
-    console.log('Adding plain transport', { transportId: transport.id })
-    this.peers.get(socket_id).addTransport(transport)
+    await rtpTransport.connect({
+	    ip: "13.124.39.3",
+	    port: rtpPort,
+    	    rtcpPort: rtcpPort
+    })
+
+
+    console.log(
+      "mediasoup VIDEO RTP SEND transport connected: %s:%d <--> %s:%d (%s)",
+      rtpTransport.tuple.localIp,
+      rtpTransport.tuple.localPort,
+      rtpTransport.tuple.remoteIp,
+      rtpTransport.tuple.remotePort,
+      rtpTransport.tuple.protocol
+    );
+
+    console.log(
+      "mediasoup VIDEO RTCP SEND transport connected: %s:%d <--> %s:%d (%s)",
+      rtpTransport.rtcpTuple.localIp,
+      rtpTransport.rtcpTuple.localPort,
+      rtpTransport.rtcpTuple.remoteIp,
+      rtpTransport.rtcpTuple.remotePort,
+      rtpTransport.rtcpTuple.protocol
+    );
+	  
+    console.log('Adding plain transport', { transportId: rtpTransport.id })
+    this.peers.get(socket_id).addTransport(rtpTransport)
 
     const codecs = []
     const routerCodec = this.router.rtpCapabilities.codecs.find(
 	    codec => codec.kind === producer.kind
     )
-
+ 
+    console.log({
+      'codecs': routerCodec 
+    })
     codecs.push(routerCodec)
 
     const rtpCapabilities = {
@@ -60,13 +99,48 @@ module.exports = class Room {
 	    rtcpFeedback: []
     }
 
-    const rtpConsumer = await transport.consume({
+    console.log({
 	    producerId: producer.id,
-	    rtpCapabilities,
-	    paused: false
+	    rtpCapabilities
     })
 
-    let { consumer, params } = await this.peers.get(socket_id).createConsumer(transport.id, producer.id, rtpCapabilities)
+    
+    const rtpConsumer = await rtpTransport.consume({
+	    producerId: producer.id,
+	    rtpCapabilities
+    })
+
+    console.log({
+      'rtpConsumer': rtpConsumer
+    })
+   
+    console.log({
+      'rtpConsumer.kind': rtpConsumer.kind
+    })
+	  
+    console.log({
+      'rtpConsumer.rtpParameters': rtpConsumer.rtpParameters
+    })
+
+    console.log({
+      'rtpConsumer.rtpParameters.codecs': rtpConsumer.rtpParameters.codecs
+    })
+
+    console.log({
+      'rtpConsumer.rtpParameters.codecs.rtcpFeedback': rtpConsumer.rtpParameters.codecs.rtcpFeedback
+    })
+
+    console.log({
+      'rtpConsumer.rtpParameters.encodings': rtpConsumer.rtpParameters.encodings
+    })
+
+
+    console.log({
+      'rtpConsumer.type': rtpConsumer.type
+    })
+
+    /*
+    let { consumer, params } = await this.peers.get(socket_id).createConsumer(rtpTransport.id, producer.id, rtpCapabilities)
     consumer.on(
 	    'producerclose',
 	    function () {
@@ -80,14 +154,30 @@ module.exports = class Room {
 		    })
 	    }.bind(this)
     )
+   console.log({
+     "params": params
+   })
    return params 
-   /*
+   */
+   
     return {
       params: {
-        id: transport.id
+        id: rtpTransport.id
       }
     }
-   */
+  }
+
+  async startRecord(socket_id) {
+    let producers = Array.from(this.peers.get(socket_id).producers.values())
+    //let params = {}
+    for(const producer of producers) {
+      try {
+        await this.publishRtpStream(socket_id, producer, 50000, 50001)
+      } catch (error) {
+        console.log(error)
+      }
+    }
+    //return params
   }
 
   async createWebRtcTransport(socket_id) {
@@ -144,6 +234,9 @@ module.exports = class Room {
       async function (resolve, reject) {
         let producer = await this.peers.get(socket_id).createProducer(producerTransportId, rtpParameters, kind)
         console.log("createProducer")
+	console.log({
+	  "producer": producer.id
+	})
         resolve(producer.id)
         this.broadCast(socket_id, 'newProducers', [
           {

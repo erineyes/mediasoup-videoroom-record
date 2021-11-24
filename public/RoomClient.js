@@ -263,6 +263,14 @@ class RoomClient {
 
   //////// MAIN FUNCTIONS /////////////
 
+  async startRecord() {
+    this.socket.emit('startRecord', {})
+  }
+
+  async stopRecord() {
+    this.socket.emit('stopRecord', {})
+  }
+
   async produce(type, deviceId = null) {
     let mediaConstraints = {}
     let audio = false

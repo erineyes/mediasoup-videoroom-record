@@ -77,10 +77,9 @@ module.exports = {
     plainRtpTransport: {
       listenIp: {
        ip: '0.0.0.0',
-       announcedIp: '127.0.0.1'
+       announcedIp: null 
       },
-      rtcpMux: true,
-      comedia: false
+      rtcpMux: false
     }
   }
 }

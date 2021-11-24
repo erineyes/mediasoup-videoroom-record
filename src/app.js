@@ -124,7 +124,7 @@ io.on('connection', (socket) => {
     })
 
     try {
-      console.log('getRouterRtpCapabilities', roomList.get(socket.room_id).getRtpCapabilities())
+      //console.log('getRouterRtpCapabilities', roomList.get(socket.room_id).getRtpCapabilities())
       callback(roomList.get(socket.room_id).getRtpCapabilities())
     } catch (e) {
       callback({
@@ -190,6 +190,24 @@ io.on('connection', (socket) => {
     })
 
     callback(params)
+  })
+
+  socket.on('startRecord', async ({}, callback) => {
+    try {
+      await roomList.get(socket.room_id).startRecord(socket.id)
+    } catch (error) {
+      console.log(error)
+    }
+    //callback('success')
+  })
+
+  socket.on('stopRecord', async ({}, callback) => {
+    try {
+      await roomList.get(socket.room_id).stopRecord(socket.id)
+    } catch (error) {
+      console.log(error)
+    }
+    //callback('failed')
   })
 
   socket.on('resume', async (data, callback) => {
