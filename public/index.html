@@ -68,10 +68,10 @@
 		<button
                     id="startRecordButton"
                     class="hidden"
-                    onclick="rc.startRecord()" >
+                    onclick="rc.startRecord(recordingFile)" >
                     <i class="fas fa-camera"></i> Start Record 
                 </button>
-                <button id="stopRecordButton" class="hidden" onclick="rc.stopRecord()">
+                <button id="stopRecordButton" class="hidden" onclick="rc.stopRecord(recordingFile)">
                     <i class="fas fa-camera"></i> Stop Record
                 </button>
 
@@ -99,8 +99,16 @@
                 <h4><i class="fab fa-youtube"></i> Remote media</h4>
                 <div id="remoteVideos" class="containers"></div>
                 <div id="remoteAudios"></div>
+		<br/>
             </div>
         </div>
+
+	<div class="container">
+           <h4><i class="fab fa-youtube"></i> Recording File</h4>
+	   <br/>
+	   <br/>
+	   <h4><div id="recordingFile"></div></h4>
+	</div>
     </body>
 
     <footer>

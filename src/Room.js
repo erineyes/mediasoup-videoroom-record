@@ -1,5 +1,7 @@
 const config = require('./config')
-const recordclient = require('node-rest-client').Client;
+const { getPort, releasePort } = require('./Port')
+const recordclient = require('node-rest-client').Client
+const { v4: uuidv4 } = require('uuid')
 
 module.exports = class Room {
   constructor(room_id, worker, io) {
@@ -18,7 +20,6 @@ module.exports = class Room {
     this.peers = new Map()
     this.io = io
     this.client = new recordclient()
-    this.recorderIp = "3.37.52.70"
   }
 
   addPeer(peer) {
@@ -40,18 +41,19 @@ module.exports = class Room {
   getRtpCapabilities() {
     return this.router.rtpCapabilities
   }
-  
-  /*
-  async startRecord(socket_id) {
-    let producers = this.peers.get(socket_id).producers
-    let params = {}
-    for(const producer of producers) {
-      params = await publishRtpStream(socket_id, producer, 50000, 50001)
-    }
-    return params
-  }
-  */
 
+  unpublishRtpStream(socket_id, transport_id) {
+    let rtpConsumerId = this.peers.get(socket_id).record_consumer_ids.get(transport_id)
+    this.peers.get(socket_id).closeConsumer(rtpConsumerId)
+    this.peers.get(socket_id).removeTransport(transport_id)
+    let rtpPort = this.peers.get(socket_id).getRecordRTPPort(transport_id)
+    let rtcpPort = this.peers.get(socket_id).getRecordRTCPPort(transport_id)
+    releasePort(rtpPort)
+    releasePort(rtcpPort)
+    this.peers.get(socket_id).removeRecordRTPPort(transport_id)
+    this.peers.get(socket_id).removeRecordRTCPPort(transport_id)
+  }
+  
   async publishRtpStream(socket_id, producer, recorderIp, rtpPort, rtcpPort) {
     const rtpTransport = await this.router.createPlainTransport(config.mediasoup.plainRtpTransport)
     console.log({
@@ -84,96 +86,100 @@ module.exports = class Room {
       rtpTransport.rtcpTuple.protocol
     );
 	  
-    console.log('Adding plain transport', { transportId: rtpTransport.id })
     this.peers.get(socket_id).addTransport(rtpTransport)
+    this.peers.get(socket_id).addRecordTransportId(rtpTransport.id)
+    this.peers.get(socket_id).addRecordRTPPort(rtpTransport.id, rtpPort)
+    this.peers.get(socket_id).addRecordRTCPPort(rtpTransport.id, rtcpPort)
 
     const codecs = []
     const routerCodec = this.router.rtpCapabilities.codecs.find(
 	    codec => codec.kind === producer.kind
     )
-    /* 
+    /*
     console.log({
       'codecs': routerCodec 
     })
     */
     codecs.push(routerCodec)
-
     const rtpCapabilities = {
 	    codecs,
 	    rtcpFeedback: []
     }
-
+    /*
     console.log({
 	    producerId: producer.id,
 	    rtpCapabilities
     })
-
     const rtpConsumer = await rtpTransport.consume({
 	    producerId: producer.id,
 	    rtpCapabilities
     })
-
-    /*
     console.log({
       'rtpConsumer': rtpConsumer
     })
-   
     console.log({
       'rtpConsumer.kind': rtpConsumer.kind
     })
-	  
     console.log({
       'rtpConsumer.rtpParameters': rtpConsumer.rtpParameters
     })
-
     console.log({
       'rtpConsumer.rtpParameters.codecs': rtpConsumer.rtpParameters.codecs
     })
-
     console.log({
       'rtpConsumer.rtpParameters.codecs.rtcpFeedback': rtpConsumer.rtpParameters.codecs.rtcpFeedback
     })
-
     console.log({
       'rtpConsumer.rtpParameters.encodings': rtpConsumer.rtpParameters.encodings
     })
-
     console.log({
       'rtpConsumer.type': rtpConsumer.type
     })
     */
-    /*
     let { consumer, params } = await this.peers.get(socket_id).createConsumer(rtpTransport.id, producer.id, rtpCapabilities)
     consumer.on(
 	    'producerclose',
-	    function () {
+	    async function () {
 		    console.log('Consumer closed due to producerclose event for Recording', {
 			name: `${this.peers.get(socket_id).name}`,
 			consumer_id: `${consumer.id}`
 		    })
+		    
+		    if (this.peers.get(socket_id).getRecordId() != '') {
+		      console.log("stopRecord due to producer close")
+		      await this.stopRecord(socket_id) 
+		    }
+		    /*
+		    this.peers.get(socket_id).record_consumer_ids.forEach(function(consumer_id, transport_id) {
+		      if(consumer_id === consumer.id) {
+		        console.log("remove rtp rtcp port based on transport_id[" + transport_id + "]")
+			this.peers.get(socket_id).removeRecordRTPPort(transport_id)
+	 		this.peers.get(socket_id).removeRecordPTCPPort(transport_id)
+			break
+		    })
+		    */
 		    this.peers.get(socket_id).removeConsumer(consumer.id)
-		    this.io.to(socket_id).emit('consumerClosed for Recording', {
+		    this.io.to(socket_id).emit('consumerClosed', {
 			consumer_id: consumer.id
 		    })
+
 	    }.bind(this)
     )
+    this.peers.get(socket_id).addRecordConsumerId(rtpTransport.id, consumer.id)
+	 
    console.log({
      "params": params
    })
    return params 
-   */
-   
-    return {
-      params: {
-        id: rtpTransport.id
-      }
-    }
   }
 
 
   beginRecord(params) {
     return new Promise(resolve => {
-      this.client.post("http://" + this.recorderIp + ":8080/StartRecord", params, (data,response)=> {
+      //const rtpTransport = await this.router.createPlainTransport(config.mediasoup.plainRtpTransport)
+
+
+      this.client.post("http://" + config.mediasoup.recorderInfo.Ip + ":" + config.mediasoup.recorderInfo.Port + "/StartRecord", params, (data,response)=> {
         resolve(data)
       })
     })
@@ -181,7 +187,7 @@ module.exports = class Room {
 	
   endRecord(params) {
     return new Promise(resolve => {
-      this.client.post("http://" + this.recorderIp + ":8080/StopRecord", params, (data,response)=> {
+      this.client.post("http://" + config.mediasoup.recorderInfo.Ip + ":" + config.mediasoup.recorderInfo.Port + "/StopRecord", params, (data,response)=> {
         resolve(data)
       })
     })
@@ -193,21 +199,39 @@ module.exports = class Room {
             "Content-Type": "application/json"
           },
           data: {
-            "id": "test"
+            "id": this.peers.get(socket_id).getRecordId() 
           }
         }
+	
+        console.log("send end record")
+	console.log(params)
+	
 
         let res = await this.endRecord(params)
         if (res.code == "success") {
-          console.log("stopping recording...")
-          //await this.unpublishRtpStream(socket_id, videoProducer, this.recorderIp, 50000, 50001)
-          console.log("stopped recording...")
+          console.log("stopping recording")
+
+	  this.peers.get(socket_id).record_transport_ids.forEach(function(transport_id) {
+            console.log("unpublish rtp stream.")
+	    this.unpublishRtpStream(socket_id, transport_id) 
+	  }, this)
+	
+	  this.peers.get(socket_id).clearRecordConsumerId()
+	  this.peers.get(socket_id).clearRecordTransportId()
+
+          console.log("stopped recording")
+	  		
         } else {
-          console.log("--------")
+	  console.log("-----------------")
           console.log(res.reason)
-          console.log("--------")
         }
 
+	
+        this.io.to(socket_id).emit('stoppedRecord', {
+	  record_id: this.peers.get(socket_id).getRecordId(),
+	  record_path: "/record/" + this.peers.get(socket_id).getRecordId() + ".webm"
+	})
+        this.peers.get(socket_id).setRecordId('')
   }
 
   async startRecord(socket_id) {
@@ -230,54 +254,126 @@ module.exports = class Room {
         console.log(error)
       }
     }
-    
+
+    this.peers.get(socket_id).setRecordId(uuidv4())
     try {
       if (useVideo && useAudio) {
 
+        let video_ports = await getPort()
+	let audio_ports = await getPort()
+	let params = {
+	  headers: {
+	    "Content-Type": "application/json"
+          },
+          data: {
+            "id": this.peers.get(socket_id).getRecordId(),
+            "name": this.peers.get(socket_id).getRecordId(),
+            "path": "/home/centos/workspace/mediasoup-videoroom-record/public/record",
+            "video": {
+              "codec": "VP8",
+	      "rtp_port": video_ports.rtp_port,
+	      "rtcp_port": video_ports.rtcp_port
+	    },
+	    "audio": {
+	      "codec": "OPUS",
+	      "rtp_port": audio_ports.rtp_port,
+	      "rtcp_port": audio_ports.rtcp_port
+	    }
+	  }
+	}
+	console.log(params)
+
+	let res = await this.beginRecord(params)
+	if (res.code == "success") {
+	  console.log("starting recording with audio and video")
+          await this.publishRtpStream(socket_id, audioProducer, config.mediasoup.recorderInfo.Ip, audio_ports.rtp_port, audio_ports.rtcp_port)
+          await this.publishRtpStream(socket_id, videoProducer, config.mediasoup.recorderInfo.Ip, video_ports.rtp_port, video_ports.rtcp_port)
+          console.log("started recording with audio and video")
+        } else {
+	  releasePort(video_ports.rtp_port)
+          releasePort(video_ports.rtcp_port)
+	  releasePort(audio_ports.rtp_port)
+          releasePort(audio_ports.rtcp_port)
+          console.log(res.reason)
+        }
 
       } else if (useVideo) {
 
+	let ports = await getPort()
 	let params = {
 	  headers: { 
 	    "Content-Type": "application/json"
 	  },
 	  data: {
-	    "id": "test",
-	    "name": "testName",
-	    "path": "/home/centos/workspace/pulsar/out",
+            "id": this.peers.get(socket_id).getRecordId(),
+	    "name": this.peers.get(socket_id).getRecordId(),
+            "path": "/home/centos/workspace/mediasoup-videoroom-record/public/record",
 	    "video": {
               "codec": "VP8",
-              "rtp_port": 50000,
-              "rtcp_port": 50001
+              "rtp_port": ports.rtp_port,
+              "rtcp_port": ports.rtcp_port 
             }
 	  }
 	}
+	console.log(params)
 
 	let res = await this.beginRecord(params) 
 	if (res.code == "success") {
-          console.log("starting recording...")
-          await this.publishRtpStream(socket_id, videoProducer, this.recorderIp, 50000, 50001)
-	  console.log("started recording...")
+          console.log("starting recording video only")
+          await this.publishRtpStream(socket_id, videoProducer, config.mediasoup.recorderInfo.Ip, ports.rtp_port, ports.rtcp_port)
+	  console.log("started recording video only")
 	} else {
-	  console.log("--------")
+	  releasePort(ports.rtp_port)
+	  releasePort(ports.rtcp_port)
 	  console.log(res.reason)
-	  console.log("--------")
 	}
-
-	
 
       } else if (useAudio) {
 
+        let ports = await getPort()
+	let params = {
+	  headers: {
+            "Content-Type": "application/json"
+	  },
+          data: {
+            "id": this.peers.get(socket_id).getRecordId(),
+            "name": this.peers.get(socket_id).getRecordId(),
+            "path": "/home/centos/workspace/mediasoup-videoroom-record/public/record",
+            "audio": {
+              "codec": "OPUS",
+              "rtp_port": ports.rtp_port,
+              "rtcp_port": ports.rtcp_port
+            }
+          }
+        }
+	console.log(params)
+
+	let res = await this.beginRecord(params)
+	if (res.code == "success") {
+	  console.log("starting recording audio only")
+          await this.publishRtpStream(socket_id, audioProducer, config.mediasoup.recorderInfo.Ip, ports.rtp_port, ports.rtcp_port)
+          console.log("started recording audio only")
+        } else {
+	   releasePort(ports.rtp_port)
+	   releasePort(ports.rtcp_port)
+	   console.log(res.reason)
+	}
 
       } else {
-
-
+        this.peers.get(socket_id).setRecordId('')
       }
-
     } catch (error) {
       console.log(error)
+      this.peers.get(socket_id).setRecordId('')
     }
-     
+
+    if(this.peers.get(socket_id).getRecordId() != '') {
+        this.io.to(socket_id).emit('startedRecord', {
+	  record_id: this.peers.get(socket_id).getRecordId(),
+          record_path: "/record/" + this.peers.get(socket_id).getRecordId() + ".webm"
+	})
+        //this.peers.get(socket_id).setRecordId('')
+    }
   }
 
   async createWebRtcTransport(socket_id) {

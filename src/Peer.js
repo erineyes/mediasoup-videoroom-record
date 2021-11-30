@@ -5,8 +5,93 @@ module.exports = class Peer {
     this.transports = new Map()
     this.consumers = new Map()
     this.producers = new Map()
+    this.record_id = ''
+    this.record_transport_ids = [] 
+    this.record_consumer_ids = new Map()
+    this.record_rtp_ports = new Map()
+    this.record_rtcp_ports = new Map()
   }
 
+  setRecordId(id) {
+    this.record_id = id
+  }	
+
+  getRecordId() {
+    return this.record_id
+  }
+
+  addRecordRTPPort(transport_id, port_number) {
+    this.record_rtp_ports.set(transport_id, port_number)
+  }
+
+  addRecordRTCPPort(transport_id, port_number) {
+    this.record_rtcp_ports.set(transport_id, port_number)
+  }
+
+  getRecordRTPPort(transport_id) {
+    return this.record_rtp_ports.get(transport_id)
+  }
+	
+  getRecordRTCPPort(transport_id) {
+    return this.record_rtcp_ports.get(transport_id)
+  }
+
+  removeRecordRTPPort(transport_id) {
+    this.record_rtp_ports.delete(transport_id)
+  }
+
+  removeRecordRTCPPort(transport_id) {
+    this.record_rtcp_ports.delete(transport_id)
+  }
+
+  clearRecordPort() {
+    this.record_rtp_ports.length = 0
+    this.record_rtcp_ports.length = 0
+  }
+
+  addRecordTransportId(transport_id) {
+    this.record_transport_ids.push(transport_id)
+  }
+
+  addRecordConsumerId(transport_id, consumer_id) {
+    this.record_consumer_ids.set(transport_id, consumer_id)
+  }
+
+  clearRecordTransportId() {
+    this.record_transport_ids.length = 0 
+  }
+
+  clearRecordConsumerId() {
+    this.record_consumer_ids.clear()
+  }
+  
+  removeTransport(transport_id) {
+    let transport = this.transports.get(transport_id)
+
+    try {
+      transport.close()
+    } catch (error) {
+      console.error('Transport close failed', error)
+      return
+    }
+
+    this.transports.delete(transport_id)
+  }
+
+  closeConsumer(consumer_id) {
+    try {
+      console.log('close consumer[' + this.consumers.get(consumer_id).kind + ']')
+      this.consumers.get(consumer_id).close()
+    } catch (e) {
+      console.warn(e)
+    }
+
+    this.consumers.delete(consumer_id)
+  }
+
+
+  ///////////////////////////////////////////////////////////
+  
   addTransport(transport) {
     this.transports.set(transport.id, transport)
   }
@@ -55,18 +140,22 @@ module.exports = class Peer {
       return
     }
 
+    /*
     if (consumer.type === 'simulcast') {
       await consumer.setPreferredLayers({
         spatialLayer: 2,
         temporalLayer: 2
       })
     }
+    */
 
     this.consumers.set(consumer.id, consumer)
 
+    
     consumer.on(
       'transportclose',
       function () {
+        console.log('close consumer[' + this.consumers.get(consumer_id).kind + ']')
         console.log('Consumer transport close', { name: `${this.name}`, consumer_id: `${consumer.id}` })
         this.consumers.delete(consumer.id)
       }.bind(this)

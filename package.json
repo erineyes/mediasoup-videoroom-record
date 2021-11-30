@@ -1,11 +1,12 @@
 {
-  "name": "mediasoup-custom",
+  "name": "mediasoup-record",
   "version": "1.0.0",
   "description": "",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node src/app.js",
+    "debug": "node src/app.js",
+    "start": "pm2 start ecosystem.config.js --only mediasoup-record",
     "mon": "nodemon src/app.js",
     "watch": "watchify public/index.js -o public/bundle.js -v",
     "lint": "npx prettier --write .",
@@ -22,8 +23,9 @@
     "httpolyglot": "^0.1.2",
     "mediasoup": "^3.8.2",
     "mediasoup-client": "^3.6.37",
-    "node-rest-client": "^3.1.0",
-    "socket.io": "^4.1.3"
+    "node-rest-client": "^1.4.4",
+    "socket.io": "^4.1.3",
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
     "prettier": "2.3.2"

@@ -11,7 +11,9 @@ const _EVENTS = {
   startAudio: 'startAudio',
   stopAudio: 'stopAudio',
   startScreen: 'startScreen',
-  stopScreen: 'stopScreen'
+  stopScreen: 'stopScreen',
+  startedRecord: 'startedRecord',
+  stoppedRecord: 'stoppedRecord'
 }
 
 class RoomClient {
@@ -259,16 +261,32 @@ class RoomClient {
         this.exit(true)
       }.bind(this)
     )
+
+    this.socket.on(
+      'startedRecord',
+      function (data) {
+	recordingFile.innerText = "recording started"
+      }.bind(this)
+    )
+	  
+    this.socket.on(
+      'stoppedRecord',
+      function (data) {
+	recordingFile.innerHTML = "<a href='"+ data.record_path +"' target='_blank'>"+ data.record_id  +"</a>"
+      }.bind(this)
+    )
   }
 
   //////// MAIN FUNCTIONS /////////////
 
-  async startRecord() {
+  async startRecord(recordingFile) {
     this.socket.emit('startRecord', {})
+    this.recordingFile = recordingFile 
   }
 
-  async stopRecord() {
+  async stopRecord(recordingFile) {
     this.socket.emit('stopRecord', {})
+    this.recordingFile = recordingFile
   }
 
   async produce(type, deviceId = null) {
@@ -291,11 +309,11 @@ class RoomClient {
           video: {
             width: {
               min: 640,
-              ideal: 1920
+              ideal: 640 
             },
             height: {
               min: 400,
-              ideal: 1080
+              ideal: 400 
             },
             deviceId: deviceId
             /*aspectRatio: {

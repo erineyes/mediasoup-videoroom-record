@@ -41,6 +41,8 @@ function roomOpen() {
   hide(stopVideoButton)
   reveal(startScreenButton)
   hide(stopScreenButton)
+  hide(startRecordButton)
+  hide(stopRecordButton)
   reveal(exitButton)
   reveal(copyButton)
   reveal(devicesButton)
@@ -115,6 +117,14 @@ function addListeners() {
     hide(copyButton)
     hide(devicesButton)
     reveal(login)
+  })
+  rc.on(RoomClient.EVENTS.startedRecord, () => {
+    const element = document.getElementById('MessageFromServer');
+    element.innerHTML = '<h1>Recording is Started</h1>';
+  })
+  rc.on(RoomClient.EVENTS.stoppedRecord, () => {
+    const element = document.getElementById('MessageFromServer');
+    element.innerHTML = '<h1>Recording is Stopped</h1>';
   })
 }
 

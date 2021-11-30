@@ -19,7 +19,11 @@ body {
 }
 
 .container {
-  display: flex;
+  display: block;
+}
+
+.container2 {
+  display: block;
 }
 
 .vid {
